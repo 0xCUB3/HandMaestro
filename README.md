@@ -15,11 +15,11 @@ It utilizes your webcam and sophisticated on-device machine learning to interpre
 3.  **Gesture Classification:** These landmarks are then passed to a custom-trained machine learning model (`ASL_Recognizer.task`). This model, trained on thousands of Kaggle images, has been specifically designed to classify the configuration of parts of the hand into corresponding ASL alphabet signs.
 4.  **Real-time Feedback:** The recognized sign is instantly displayed to the user, allowing for immediate comparison against the target sign they are practicing.
 
-This machine learning pipeline offers learners the ability to practice independently, receive instant visual confirmation of their attempts, and iteratively refine their handshapes for greater accuracy.
+This machine learning pipeline offers learners the ability to practice independently and receive instant visual confirmation of their attempts.
 
-**Core Technologies:**
+## Core Technologies:
 
-*   **Machine Learning Engine:** MediaPipe (`GestureRecognizer` Task) for robust, real-time hand landmark detection and ASL gesture classification directly in the browser.
+*   **Machine Learning Engine:** MediaPipe (`GestureRecognizer` Task) for real-time hand landmark detection and ASL gesture classification directly in the browser.
 *   **Application Framework:** Astro
 *   **Primary Language:** TypeScript
 *   **Frontend User Interface:** HTML, CSS
