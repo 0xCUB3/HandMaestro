@@ -1,47 +1,23 @@
-# Astro Starter Kit: Minimal
+# HandMaestro: ASL Practice Platform
 
-```sh
-npm create astro@latest -- --template minimal
-```
+HandMaestro is a web application that provides an interactive platform for learning American Sign Language (ASL).
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/withastro/astro/tree/latest/examples/minimal)
-[![Open with CodeSandbox](https://assets.codesandbox.io/github/button-edit-lime.svg)](https://codesandbox.io/p/sandbox/github/withastro/astro/tree/latest/examples/minimal)
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/withastro/astro?devcontainer_path=.devcontainer/minimal/devcontainer.json)
+It utilizes your webcam and sophisticated on-device machine learning to interpret and provide real-time feedback on ASL gestures, starting with the foundational alphabet. This approach gives instant feedback, allowing for fast, free practice.
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+## How the ASL Recognition Works:
 
-## 🚀 Project Structure
+1.  **Webcam Input:** The application accesses your device's webcam to capture a live video stream.
+2.  **Hand Landmark Detection:** MediaPipe's `GestureRecognizer` processes this video feed in real-time, identifying key points (landmarks) on the user's hand within each frame. This creates a skeletal model of the hand.
+3.  **Gesture Classification:** These landmarks are then passed to a custom-trained machine learning model (`ASL_Recognizer.task`). This model, trained on thousands of Kaggle images, has been specifically designed to classify the configuration of parts of the hand into corresponding ASL alphabet signs.
+4.  **Real-time Feedback:** The recognized sign is instantly displayed to the user, allowing for immediate comparison against the target sign they are practicing.
 
-Inside of your Astro project, you'll see the following folders and files:
+This machine learning pipeline offers learners the ability to practice independently, receive instant visual confirmation of their attempts, and iteratively refine their handshapes for greater accuracy.
 
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
-```
+**Core Technologies:**
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+*   **Machine Learning Engine:** MediaPipe (`GestureRecognizer` Task) for robust, real-time hand landmark detection and ASL gesture classification directly in the browser.
+*   **Application Framework:** Astro
+*   **Primary Language:** TypeScript
+*   **Frontend User Interface:** HTML, CSS
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
-
-Any static assets, like images, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+HandMaestro aims to deliver a responsive and accurate learning experience for individuals working on their ASL.

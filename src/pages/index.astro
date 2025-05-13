@@ -1,5 +1,5 @@
 ---
-
+import PracticeArea from '../components/PracticeArea.astro';
 ---
 
 <html lang="en">
@@ -8,9 +8,23 @@
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="viewport" content="width=device-width" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
+		<title>HandMaestro</title> 
+		<style>
+			body {
+				font-family: sans-serif;
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				margin: 0;
+				background-color: #f0f0f0;
+			}
+			h1 {
+				color: #333;
+			}
+		</style>
 	</head>
 	<body>
-		<h1>Astro</h1>
+		<h1>HandMaestro</h1>
+		<PracticeArea />
 	</body>
 </html>

@@ -1,0 +1,1007 @@
+<div id="practice-controls" style="text-align: center;">
+  <!-- Mode Selection -->
+  <div id="mode-selection-container" style="margin-bottom: 20px; display: flex; justify-content: center;">
+    <div class="mode-button" data-mode="letter">Letter Practice</div>
+    <div class="mode-button" data-mode="word">Word/Phrase Practice</div>
+  </div>
+
+  <!-- Word/Phrase Input Area -->
+  <div id="word-practice-setup" class="collapsible-section">
+    <input type="text" id="word-input" placeholder="Enter word...">
+    <button id="start-word-practice-btn" class="button-primary">Start</button>
+  </div>
+
+  <!-- Core Practice Display Area -->
+  <div id="core-practice-display" class="collapsible-section">
+    <div id="sign-display-area">
+      <span id="target-sign-display">A</span>
+      <span id="detected-sign-display"></span>
+    </div>
+    <p id="feedback-message">&nbsp;</p>
+    <div id="hint-action-area">
+        <button id="new-letter-btn" class="button-primary">New Letter</button>
+        <button id="change-word-btn" class="button-secondary" style="display: none;">Change Word</button>
+        <button id="hint-btn" class="button-secondary">Hint</button>
+        <button id="toggle-cheatsheet-btn" class="button-secondary">Alphabet Sheet</button>
+    </div>
+    <p id="hint-display">&nbsp;</p>
+  </div>
+  
+  <!-- Tertiary Actions - now primarily for the subtle link -->
+  <div id="tertiary-actions" style="margin-top: 15px; text-align: center;">
+    <a href="#" id="why-asl-link" style="font-size: 0.75em; color: #8e8e93; text-decoration: none;">Why Learn ASL?</a>
+  </div>
+
+</div>
+
+<div id="cheatsheet-modal-overlay" class="modal-overlay">
+  <div class="modal-content">
+    <img id="cheatsheet-img" src="/cheatsheet.jpeg" alt="ASL Alphabet Cheatsheet">
+  </div>
+</div>
+
+<!-- ASL Info Modal -->
+<div id="asl-info-modal-overlay" class="modal-overlay">
+  <div id="asl-info-modal-content" class="modal-content">
+    <h2>Discover the Rich World of American Sign Language</h2>
+    <p>Step into the vibrant world of American Sign Language (ASL)! More than just hand gestures, ASL is a complete visual language with its own unique grammar and cultural richness, primarily used by Deaf and Hard of Hearing communities in the United States. Interestingly, it's the third most commonly used language in the U.S. after English and Spanish, and has fascinating linguistic connections more akin to spoken Japanese or Navajo than to English!</p>
+    
+    <h3 style="font-size: 1.05em; margin-top: 18px; margin-bottom: 8px;">Fun Facts About ASL:</h3>
+    <ul>
+      <li><strong>The Story:</strong> Born in the early 1800s with the pioneering work of Thomas Hopkins Gallaudet and Laurent Clerc (the first Deaf teacher from France), ASL has a rich history and has evolved into the expressive language it is today, with strong roots in French Sign Language.</li>
+      <li><strong>Connect & Communicate:</strong> Learning ASL opens doors to connecting with a vibrant community, fostering new friendships, and understanding a unique cultural perspective. It's used by over half a million people in the US as their native language.</li>
+      <li><strong>A Good Brain Workout:</strong> Engaging with a visual language like ASL is a fantastic workout for your brain, enhancing cognitive skills and offering a fresh way to perceive communication.</li>
+      <li><strong>More Than "English on Hands":</strong> ASL is not a signed representation of English. It's an independent language with its own sentence structure, using hand shape, palm orientation, movement, location, and gestural features like facial expressions.</li>
+      <li><strong>Did You Know?</strong> There isn't one universal sign language! Just like spoken languages, many different sign languages (over 300, according to the World Federation of the Deaf) have developed around theworld. Someone using ASL would not be able to understand someone using British Sign Language (BSL), for example.</li>
+    </ul>
+    <p style="margin-top: 18px;">Learning ASL is an opportunity to explore and contribute to a more inclusive world. Every sign learned is a bridge built.</p>
+    <button id="close-asl-info-btn" class="button-tertiary">Close</button>
+  </div>
+</div>
+
+<div id="practice-area">
+  <video id="webcam" autoplay playsinline width="640" height="480"></video>
+  <canvas id="overlay" width="640" height="480" style="position: absolute; top: 0; left: 0;"></canvas>
+  <div id="correct-animation-overlay" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px 40px; background-color: rgba(40, 167, 69, 0.85); color: white; font-size: 2.5em; font-weight: bold; border-radius: 10px; z-index: 100;">Correct!</div>
+  <p id="status">Loading models and webcam...</p>
+</div>
+
+<script>
+  console.log("PracticeArea component script loaded.");
+
+  const videoElement = document.getElementById('webcam') as HTMLVideoElement;
+  const canvasElement = document.getElementById('overlay') as HTMLCanvasElement;
+  const statusElement = document.getElementById('status') as HTMLParagraphElement;
+  const canvasCtx = canvasElement.getContext('2d');
+
+  const targetSignDisplay = document.getElementById('target-sign-display') as HTMLSpanElement;
+  const predictedSignDisplay = document.getElementById('detected-sign-display') as HTMLSpanElement;
+  const newLetterBtn = document.getElementById('new-letter-btn') as HTMLButtonElement;
+  const feedbackMessageElement = document.getElementById('feedback-message') as HTMLParagraphElement;
+
+  const modeButtons = document.querySelectorAll('.mode-button') as NodeListOf<HTMLDivElement>;
+  const wordPracticeSetupDiv = document.getElementById('word-practice-setup') as HTMLDivElement;
+  const wordInput = document.getElementById('word-input') as HTMLInputElement;
+  const startWordPracticeBtn = document.getElementById('start-word-practice-btn') as HTMLButtonElement;
+  const correctAnimationOverlay = document.getElementById('correct-animation-overlay') as HTMLDivElement;
+  const actionButtonsDiv = document.getElementById('action-buttons') as HTMLDivElement;
+  const targetSignParagraph = document.querySelector('#practice-controls > p:nth-of-type(1)') as HTMLParagraphElement; // Target Sign <p>
+  const detectedSignParagraph = document.querySelector('#practice-controls > p:nth-of-type(2)') as HTMLParagraphElement; // Detected <p>
+  const corePracticeDisplayDiv = document.getElementById('core-practice-display') as HTMLDivElement;
+  const hintActionAreaDiv = document.getElementById('hint-action-area') as HTMLDivElement;
+  const tertiaryActionsDiv = document.getElementById('tertiary-actions') as HTMLDivElement;
+  const changeWordBtn = document.getElementById('change-word-btn') as HTMLButtonElement;
+
+  let currentPracticeMode = 'letter';
+  let previousPracticeMode = currentPracticeMode; // To help with initial animation states
+
+  const toggleCheatsheetBtn = document.getElementById('toggle-cheatsheet-btn') as HTMLButtonElement;
+  const cheatsheetModalOverlay = document.getElementById('cheatsheet-modal-overlay') as HTMLDivElement;
+
+  const whyAslLink = document.getElementById('why-asl-link') as HTMLAnchorElement;
+  const aslInfoModalOverlay = document.getElementById('asl-info-modal-overlay') as HTMLDivElement;
+  const closeAslInfoBtn = document.getElementById('close-asl-info-btn') as HTMLButtonElement;
+
+  // Define the signs your model can recognize. This might need to be adjusted
+  // based on the actual categories in ASL_Recognizer.task
+  const availableSigns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y']; // Removed J, Z as per Sign-ify
+  let currentSignIndex = 0;
+  let signsAlreadyPracticedInLetterMode: string[] = []; // Keep track of practiced signs to avoid immediate repeats
+
+  let currentWordToPractice = "";
+  let currentWordLetterIndex = 0;
+  let correctSignStartTime: number | null = null;
+  const CORRECT_SIGN_HOLD_DURATION = 300; // milliseconds
+
+  let gestureRecognizer: any = null;
+  let vision: any = null; // To store FilesetResolver instance
+  let GestureRecognizerLib: any = null; // To store the visionBundle
+  let drawingUtils: any = null;
+  let HAND_CONNECTIONS_DATA: any = null; 
+
+  // import { getAslGestures } from '../gestures/aslAlphabet.js'; // REMOVED - No longer using Fingerpose
+  import { getHint } from '../gestures/aslHints.js';
+
+  const visionTasksVersion = 'latest'; // Using latest to avoid specific version issues for now
+
+  const hintBtn = document.getElementById('hint-btn') as HTMLButtonElement;
+  const hintDisplay = document.getElementById('hint-display') as HTMLDivElement;
+
+  hintBtn.addEventListener('click', () => {
+    const currentTargetSign = availableSigns[currentSignIndex];
+    const isHintEffectivelyEmpty = hintDisplay.textContent?.trim() === '' || hintDisplay.innerHTML === '&nbsp;';
+
+    if (isHintEffectivelyEmpty) {
+      // Show hint
+      const hintText = getHint(currentTargetSign);
+      hintDisplay.textContent = hintText;
+      // hintBtn.textContent = "Hide Hint"; // Optional: update button text
+    } else {
+      // Hide hint
+      hintDisplay.innerHTML = "&nbsp;"; // Clear hint and maintain space
+      // hintBtn.textContent = "Show Hint"; // Optional: update button text
+    }
+  });
+
+  if (toggleCheatsheetBtn && cheatsheetModalOverlay) {
+    toggleCheatsheetBtn.addEventListener('click', () => {
+      if (!cheatsheetModalOverlay.classList.contains('visible')) {
+        cheatsheetModalOverlay.classList.add('visible');
+        toggleCheatsheetBtn.textContent = 'Hide Alphabet Sheet';
+      } else {
+        cheatsheetModalOverlay.classList.remove('visible');
+        toggleCheatsheetBtn.textContent = 'Show Alphabet Sheet';
+      }
+    });
+
+    // Click on overlay (outside the image) to close
+    cheatsheetModalOverlay.addEventListener('click', (event) => {
+      if (event.target === cheatsheetModalOverlay) { // Check if the click was directly on the overlay
+        cheatsheetModalOverlay.classList.remove('visible');
+        toggleCheatsheetBtn.textContent = 'Show Alphabet Sheet';
+      }
+    });
+  }
+
+  function updateTargetSignDisplay() {
+    if (targetSignDisplay) {
+      targetSignDisplay.textContent = availableSigns[currentSignIndex];
+    }
+    if (hintDisplay) { // Clear any existing hint when the sign changes
+      hintDisplay.innerHTML = "&nbsp;"; 
+    }
+    if (feedbackMessageElement) {
+      feedbackMessageElement.textContent = "Show the sign above!";
+      feedbackMessageElement.style.color = 'black';
+    }
+  }
+
+  if (newLetterBtn) {
+    newLetterBtn.addEventListener('click', () => {
+      if (currentPracticeMode === 'letter') {
+        // Select a new random sign, try not to repeat immediately
+        let nextRandomIndex;
+        if (availableSigns.length === 1) {
+          nextRandomIndex = 0;
+        } else if (signsAlreadyPracticedInLetterMode.length >= availableSigns.length) {
+          signsAlreadyPracticedInLetterMode = []; // Reset if all signs have been shown
+          do {
+            nextRandomIndex = Math.floor(Math.random() * availableSigns.length);
+          } while (nextRandomIndex === currentSignIndex && availableSigns.length > 1);
+        } else {
+          do {
+            nextRandomIndex = Math.floor(Math.random() * availableSigns.length);
+          } while ( (signsAlreadyPracticedInLetterMode.includes(availableSigns[nextRandomIndex]) || nextRandomIndex === currentSignIndex) && signsAlreadyPracticedInLetterMode.length < availableSigns.length -1 );
+        }
+        currentSignIndex = nextRandomIndex;
+        if (!signsAlreadyPracticedInLetterMode.includes(availableSigns[currentSignIndex])) {
+            signsAlreadyPracticedInLetterMode.push(availableSigns[currentSignIndex]);
+        }
+        updateTargetSignDisplay();
+        hintDisplay.innerHTML = "&nbsp;"; // Clear hint on new letter
+      }
+    });
+  }
+
+  // Function to draw landmarks and connections
+  function drawHandResults(results: any) {
+    if (!canvasCtx || !canvasElement || !drawingUtils || !HAND_CONNECTIONS_DATA) return;
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+    if (results.landmarks && results.landmarks.length > 0) {
+      for (const landmarks of results.landmarks) {
+        drawingUtils.drawConnectors(landmarks, HAND_CONNECTIONS_DATA, {
+          color: "#E2DDFD", 
+          lineWidth: 3
+        });
+        drawingUtils.drawLandmarks(landmarks, { color: "#2F404D", lineWidth: 2 });
+      }
+    }
+    canvasCtx.restore();
+  }
+
+  async function loadGestureRecognizer() {
+    try {
+      if (statusElement) statusElement.textContent = "Loading MediaPipe Gesture Recognizer...";
+
+      GestureRecognizerLib = await import(/* @vite-ignore */ `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${visionTasksVersion}/vision_bundle.js`);
+      console.log("DEBUG: vision_bundle.js (GestureRecognizerLib) loaded:", GestureRecognizerLib);
+      
+      // Attempt to get DrawingUtils and HAND_CONNECTIONS from the visionBundle
+      if (GestureRecognizerLib && GestureRecognizerLib.DrawingUtils) { // Case-sensitive: DrawingUtils
+        drawingUtils = new GestureRecognizerLib.DrawingUtils(canvasCtx); // Instantiate DrawingUtils
+        console.log("DEBUG: Found and instantiated DrawingUtils from GestureRecognizerLib.");
+        
+        // HAND_CONNECTIONS is usually a static property or a separate export.
+        // It might be on GestureRecognizerLib.DrawingUtils (static property) or GestureRecognizerLib directly.
+        if (GestureRecognizerLib.DrawingUtils.HAND_CONNECTIONS) {
+            HAND_CONNECTIONS_DATA = GestureRecognizerLib.DrawingUtils.HAND_CONNECTIONS;
+            console.log("DEBUG: Found HAND_CONNECTIONS on DrawingUtils class.");
+        } else if (GestureRecognizerLib.HAND_CONNECTIONS) { // Check if it's exported at the top level of the bundle
+            HAND_CONNECTIONS_DATA = GestureRecognizerLib.HAND_CONNECTIONS;
+            console.log("DEBUG: Found HAND_CONNECTIONS on GestureRecognizerLib itself.");
+        } else {
+            console.warn("DEBUG: HAND_CONNECTIONS not found. Landmark connections will not be drawn.");
+            HAND_CONNECTIONS_DATA = []; // Default to empty if not found
+        }
+      } else {
+        console.warn("DEBUG: DrawingUtils class not found on GestureRecognizerLib. Landmarks will not be drawn.");
+      }
+
+      if (!GestureRecognizerLib.FilesetResolver || !GestureRecognizerLib.GestureRecognizer) {
+        throw new Error("Failed to load MediaPipe Tasks FilesetResolver or GestureRecognizer from vision_bundle.js");
+      }
+
+      vision = await GestureRecognizerLib.FilesetResolver.forVisionTasks(
+        `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${visionTasksVersion}/wasm`
+      );
+
+      gestureRecognizer = await GestureRecognizerLib.GestureRecognizer.createFromOptions(vision, {
+        baseOptions: {
+          // IMPORTANT: Replace with the correct path to your model!
+          // Assuming you place ASL_Recognizer.task in the public/models/ directory of your Astro project.
+          modelAssetPath: `/models/ASL_Recognizer.task`, 
+          delegate: "GPU" // Use GPU if available, can also be "CPU"
+        },
+        runningMode: "VIDEO", // 'VIDEO' for recognizeForVideo, or 'LIVE_STREAM' for recognizeAsync
+        numHands: 1,
+        // Canned gestures are not needed if the .task model handles ASL directly
+        // minHandDetectionConfidence: 0.5,
+        // minHandPresenceConfidence: 0.5,
+        // minTrackingConfidence: 0.5,
+      });
+
+      if (statusElement) statusElement.textContent = "Gesture Recognizer ready.";
+      console.log("MediaPipe Gesture Recognizer loaded and configured.");
+      updateTargetSignDisplay(); // Initialize target sign display
+
+    } catch (err) {
+      console.error("Error loading MediaPipe Gesture Recognizer: ", err);
+      if (statusElement) statusElement.textContent = "Error loading Gesture Recognizer.";
+      alert("Error loading Gesture Recognizer: " + (err as Error).message);
+    }
+  }
+
+  let lastVideoTime = -1;
+  async function predictWebcam() {
+    if (!gestureRecognizer || videoElement.readyState < videoElement.HAVE_METADATA || videoElement.paused || videoElement.ended) {
+      requestAnimationFrame(predictWebcam);
+      return;
+    }
+
+    const startTimeMs = performance.now();
+    if (videoElement.currentTime !== lastVideoTime) {
+      lastVideoTime = videoElement.currentTime;
+      const results = gestureRecognizer.recognizeForVideo(videoElement, startTimeMs);
+
+      // Draw landmarks
+      drawHandResults(results);
+
+      // Process gestures
+      if (results.gestures && results.gestures.length > 0 && results.gestures[0].length > 0) {
+        const topGesture = results.gestures[0][0];
+        const prediction = topGesture.categoryName;
+        const confidence = Math.round(topGesture.score * 100);
+        
+        if (predictedSignDisplay) predictedSignDisplay.textContent = `${prediction} (${confidence}%)`;
+
+        if (currentPracticeMode === 'letter') {
+          const currentTargetSign = availableSigns[currentSignIndex];
+          if (feedbackMessageElement) {
+            if (prediction.toUpperCase() === currentTargetSign.toUpperCase() && confidence > 30) {
+              feedbackMessageElement.textContent = "Correct!";
+              feedbackMessageElement.style.color = 'green';
+            } else if (confidence > 30) { 
+              feedbackMessageElement.textContent = `Try Again (Detected: ${prediction})`;
+              feedbackMessageElement.style.color = 'red';
+            } else {
+              feedbackMessageElement.textContent = "Keep trying...";
+              feedbackMessageElement.style.color = 'orange';
+            }
+          }
+        } else if (currentPracticeMode === 'word' && currentWordToPractice) {
+          const currentTargetLetter = currentWordToPractice[currentWordLetterIndex];
+          if (targetSignDisplay.textContent !== currentTargetLetter && availableSigns.includes(currentTargetLetter)) {
+             targetSignDisplay.textContent = currentTargetLetter;
+          }
+
+          if (prediction.toUpperCase() === currentTargetLetter?.toUpperCase() && confidence > 30) {
+            if (correctSignStartTime === null) {
+              correctSignStartTime = performance.now();
+              feedbackMessageElement.textContent = `Hold ${currentTargetLetter}...`;
+              feedbackMessageElement.style.color = 'blue';
+            } else {
+              if ((performance.now() - correctSignStartTime) >= CORRECT_SIGN_HOLD_DURATION) {
+                feedbackMessageElement.textContent = `Next...`;
+                feedbackMessageElement.style.color = 'green';
+                
+                // Trigger Correct Animation
+                if (correctAnimationOverlay) {
+                  correctAnimationOverlay.classList.add('show-animation');
+                  setTimeout(() => {
+                    correctAnimationOverlay.classList.remove('show-animation');
+                    // Ensure display is none after animation for subsequent triggers
+                    correctAnimationOverlay.style.display = 'none'; 
+                  }, 1000); // Duration of the animation
+                }
+
+                currentWordLetterIndex++;
+                correctSignStartTime = null;
+                if (currentWordLetterIndex < currentWordToPractice.length) {
+                  updateTargetSignForWordPractice();
+                } else {
+                  targetSignDisplay.textContent = "-";
+                  feedbackMessageElement.textContent = "Word complete!";
+                  wordPracticeSetupDiv.style.display = 'block'; 
+                  wordInput.focus(); // Focus input for next word
+                  currentWordToPractice = ""; 
+                }
+              }
+            }
+          } else {
+            if (correctSignStartTime !== null) {
+              feedbackMessageElement.textContent = `Lost ${currentTargetLetter}! Try again.`;
+              feedbackMessageElement.style.color = 'red';
+            }
+            correctSignStartTime = null; 
+            if (prediction.toUpperCase() !== currentTargetLetter?.toUpperCase() && confidence > 30) {
+                 feedbackMessageElement.textContent = `Detected: ${prediction} (Needed: ${currentTargetLetter})`;
+                 feedbackMessageElement.style.color = 'red';
+            } else if (confidence <= 30 && currentWordToPractice && currentWordLetterIndex < currentWordToPractice.length) {
+                 feedbackMessageElement.textContent = `Show ${currentTargetLetter}`;
+                 feedbackMessageElement.style.color = 'orange';
+            }
+          }
+        }
+
+      } else {
+        if (predictedSignDisplay) predictedSignDisplay.textContent = "";
+        if (feedbackMessageElement && (feedbackMessageElement.textContent === "Correct!" || feedbackMessageElement.textContent?.startsWith("Try Again"))) {
+          feedbackMessageElement.textContent = "No gesture detected.";
+          feedbackMessageElement.style.color = 'orange';
+        }
+      }
+    }
+    requestAnimationFrame(predictWebcam);
+  }
+
+  async function setupWebcam() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      videoElement.srcObject = stream;
+      videoElement.addEventListener('loadeddata', async () => {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        if (statusElement) statusElement.textContent = "Webcam active. Initializing models...";
+        
+        await loadGestureRecognizer(); 
+        
+        if (gestureRecognizer) {
+          predictWebcam(); // Start the prediction loop
+        }
+      });
+    } catch (err) {
+      console.error("Error accessing webcam: ", err);
+      if (statusElement) statusElement.textContent = "Error accessing webcam. Please grant permission and refresh.";
+      alert("Error accessing webcam: " + (err as Error).message);
+    }
+  }
+
+  // Ensure the DOM is fully loaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupWebcam);
+  } else {
+    setupWebcam();
+  }
+
+  // --- MODE SELECTION LOGIC --- 
+  modeButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      modeButtons.forEach(btn => btn.classList.remove('active-mode'));
+      button.classList.add('active-mode');
+
+      previousPracticeMode = currentPracticeMode; // Store before changing
+      currentPracticeMode = button.dataset.mode || 'letter';
+      localStorage.setItem('lastPracticeMode', currentPracticeMode);
+
+      currentWordToPractice = ""; 
+      currentWordLetterIndex = 0;
+      correctSignStartTime = null;
+      signsAlreadyPracticedInLetterMode = []; // Reset for both modes when switching
+      
+      if(hintDisplay) hintDisplay.innerHTML = "&nbsp;";
+      // Feedback and target sign will be set by updateUIVisibilityForMode or subsequent calls
+
+      if (currentPracticeMode === 'letter') {
+        if (availableSigns.length > 0) {
+            let randomIndex;
+            if (availableSigns.length === 1) {
+                randomIndex = 0;
+            } else {
+                do {
+                    randomIndex = Math.floor(Math.random() * availableSigns.length);
+                } while (randomIndex === currentSignIndex && availableSigns.length > 1);
+            }
+            currentSignIndex = randomIndex;
+            if (!signsAlreadyPracticedInLetterMode.includes(availableSigns[currentSignIndex])){
+                 signsAlreadyPracticedInLetterMode.push(availableSigns[currentSignIndex]);
+            }
+            updateTargetSignDisplay(); // Sets target and initial feedback for letter mode
+        } else {
+            if (targetSignDisplay) targetSignDisplay.textContent = '-';
+            if (feedbackMessageElement) feedbackMessageElement.textContent = "No signs available for practice.";
+        }
+      }
+      // For word mode, initial state is handled by updateUIVisibilityForMode (shows input)
+      
+      updateUIVisibilityForMode(currentPracticeMode);
+    });
+  });
+
+  function updateUIVisibilityForMode(mode: string) {
+    const isWordMode = mode === 'word';
+    const isLetterMode = mode === 'letter';
+    const isWordPracticeActive = isWordMode && !!currentWordToPractice;
+
+    // Word Practice Setup Area (Textbox and Start button)
+    if (wordPracticeSetupDiv) {
+        wordPracticeSetupDiv.classList.toggle('visible-section', isWordMode && !isWordPracticeActive);
+        if (isWordMode && !isWordPracticeActive && wordInput) wordInput.focus();
+    }
+
+    // Core Practice Display (Target, Detected, Feedback, Hint button, New Letter button)
+    if (corePracticeDisplayDiv) {
+        corePracticeDisplayDiv.classList.toggle('visible-section', isLetterMode || isWordPracticeActive);
+    }
+    
+    // "New Letter" button visibility
+    if (newLetterBtn) {
+        newLetterBtn.style.display = isLetterMode ? 'inline-block' : 'none';
+    }
+    // Hint button and Alphabet Sheet button visibility
+    if (hintBtn) hintBtn.style.display = (isLetterMode || isWordPracticeActive) ? 'inline-block' : 'none';
+    if (toggleCheatsheetBtn) toggleCheatsheetBtn.style.display = (isLetterMode || isWordPracticeActive) ? 'inline-block' : 'none';
+    
+    // "Change Word" button visibility
+    if (changeWordBtn) {
+        changeWordBtn.style.display = isWordPracticeActive ? 'inline-block' : 'none';
+    }
+
+    // Tertiary actions (Sheet, Why ASL) - always visible
+    if (tertiaryActionsDiv) {
+        // Assuming flex is the desired layout for tertiary actions container for centering/spacing
+        tertiaryActionsDiv.style.display = 'block'; // Changed to block for the single centered link
+    }
+
+    // Update feedback message and target/detected displays based on state
+    if (feedbackMessageElement && targetSignDisplay && predictedSignDisplay) {
+        if (isWordMode && !isWordPracticeActive) {
+            feedbackMessageElement.textContent = "Enter a word to practice.";
+            targetSignDisplay.textContent = "-";
+            predictedSignDisplay.textContent = "";
+        } else if (isLetterMode) {
+            // feedbackMessage is set by updateTargetSignDisplay when a new letter is chosen
+            // If no letter is set (e.g. availableSigns is empty), updateTargetSignDisplay handles it.
+            if (!targetSignDisplay.textContent || targetSignDisplay.textContent === '-'){
+                 updateTargetSignDisplay(); // ensure it's called if somehow missed
+            }
+        } else if (isWordPracticeActive){
+            // Feedback and target are handled by updateTargetSignForWordPractice or predictWebcam
+            // We just need to ensure they are not inappropriately cleared here.
+            // If targetSignDisplay is somehow '-', it will be updated by predictWebcam or updateTargetSignForWordPractice
+        } 
+        // predictedSignDisplay is updated by predictWebcam, so no general reset here unless truly idle.
+    }
+  }
+
+  // --- WORD PRACTICE LOGIC ---
+  startWordPracticeBtn.addEventListener('click', () => {
+    const word = wordInput.value.trim().toUpperCase();
+    if (word.length > 0) {
+      currentWordToPractice = word;
+      currentWordLetterIndex = 0;
+      correctSignStartTime = null;
+      
+      updateTargetSignForWordPractice(); 
+      // Feedback message for starting word practice is now set in updateTargetSignForWordPractice as "Show [Letter]"
+      
+      updateUIVisibilityForMode(currentPracticeMode); 
+
+    } else {
+      if(feedbackMessageElement) feedbackMessageElement.textContent = "Please enter a word or phrase.";
+      if(feedbackMessageElement) feedbackMessageElement.style.color = 'red';
+    }
+  });
+
+  function updateTargetSignForWordPractice() {
+    if (currentWordToPractice && currentWordLetterIndex < currentWordToPractice.length) {
+      const currentLetter = currentWordToPractice[currentWordLetterIndex];
+      if (availableSigns.includes(currentLetter)) {
+        if(targetSignDisplay) targetSignDisplay.textContent = currentLetter; 
+        if(feedbackMessageElement) {
+            feedbackMessageElement.textContent = `Show ${currentLetter}`;
+            feedbackMessageElement.style.color = 'black';
+        }
+        if(predictedSignDisplay) predictedSignDisplay.textContent = "";
+        if(hintDisplay) hintDisplay.innerHTML = "&nbsp;";
+      } else { // Skip non-practicable characters
+        currentWordLetterIndex++;
+        if (currentWordLetterIndex < currentWordToPractice.length) {
+          updateTargetSignForWordPractice(); 
+        } else { // Reached end of word after skipping
+          if(feedbackMessageElement) feedbackMessageElement.textContent = "Word complete! (Unsupported characters were skipped)";
+          if(feedbackMessageElement) feedbackMessageElement.style.color = 'green';
+          if(targetSignDisplay) targetSignDisplay.textContent = "-";
+          if(predictedSignDisplay) predictedSignDisplay.textContent = "";
+          currentWordToPractice = ""; 
+          updateUIVisibilityForMode(currentPracticeMode); // Show word input again
+          if(wordInput) wordInput.focus();
+        }
+      }
+    } else if (currentWordToPractice && currentWordLetterIndex >= currentWordToPractice.length) { // Word genuinely complete
+      if(feedbackMessageElement) feedbackMessageElement.textContent = "Word complete!";
+      if(feedbackMessageElement) feedbackMessageElement.style.color = 'green';
+      if(targetSignDisplay) targetSignDisplay.textContent = "-";
+      if(predictedSignDisplay) predictedSignDisplay.textContent = "";
+      currentWordToPractice = ""; 
+      updateUIVisibilityForMode(currentPracticeMode); // Show word input again
+      if(wordInput) wordInput.focus();
+    }
+  }
+
+  // Event listener for the new "Change Word" button
+  if (changeWordBtn) {
+    changeWordBtn.addEventListener('click', () => {
+      if (currentPracticeMode === 'word') { // Should only be clickable in this mode anyway
+        if (wordInput && currentWordToPractice) {
+          wordInput.value = currentWordToPractice; // Pre-fill input with the current word
+        }
+        currentWordToPractice = ""; // Clear the active word
+        currentWordLetterIndex = 0;
+        correctSignStartTime = null;
+        
+        updateUIVisibilityForMode('word'); // This will show word input & hide core practice
+        // wordInput.focus(); // updateUIVisibilityForMode should handle focus
+      }
+    });
+  }
+
+  // --- LOAD PERSISTED MODE AND UPDATE RADIO BUTTONS ---
+  const persistedMode = localStorage.getItem('lastPracticeMode');
+  if (persistedMode && (persistedMode === 'letter' || persistedMode === 'word')) {
+    currentPracticeMode = persistedMode;
+    // Update the checked state of the radio buttons - NOW UPDATE ACTIVE CLASS FOR MODE BUTTONS
+    modeButtons.forEach(button => {
+      if (button.dataset.mode === currentPracticeMode) {
+        button.classList.add('active-mode');
+      } else {
+        button.classList.remove('active-mode');
+      }
+    });
+  } else {
+    // Default to first button if no persisted mode or invalid
+    if (modeButtons.length > 0) modeButtons[0].classList.add('active-mode');
+  }
+  // --- End of LOAD PERSISTED MODE ---
+
+  // --- INITIAL UI STATE SETUP --- 
+  modeButtons.forEach(button => {
+    if (button.dataset.mode === currentPracticeMode) button.classList.add('active-mode');
+    else button.classList.remove('active-mode');
+  });
+  updateUIVisibilityForMode(currentPracticeMode); // Apply initial visibility rules
+  previousPracticeMode = currentPracticeMode;
+
+  // ASL Info Modal Logic
+  if (whyAslLink && aslInfoModalOverlay && closeAslInfoBtn) {
+    whyAslLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      aslInfoModalOverlay.classList.add('visible');
+    });
+
+    closeAslInfoBtn.addEventListener('click', () => {
+      aslInfoModalOverlay.classList.remove('visible');
+    });
+
+    aslInfoModalOverlay.addEventListener('click', (event) => {
+      if (event.target === aslInfoModalOverlay) { // Click on overlay background
+        aslInfoModalOverlay.classList.remove('visible');
+      }
+    });
+  }
+</script>
+
+<style>
+  /* Apple HIG Inspired - Base Styles */
+  :root {
+    --apple-blue: #007aff;
+    --apple-blue-rgb: 0, 122, 255;
+    --apple-light-gray: #f2f2f7;
+    --apple-medium-gray: #e5e5ea;
+    --apple-dark-gray: #8e8e93; /* For secondary text */
+    --apple-text-primary: #1c1c1e; /* Nearly black */
+    --apple-text-secondary: #636366; /* For less important text */
+    --apple-separator-color: #c6c6c8;
+    --apple-control-background: #ffffff;
+    --apple-system-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  }
+
+  #practice-area {
+    position: relative;
+    width: 640px; 
+    height: 480px; 
+    margin: 20px auto; /* Increased margin slightly */
+    border: 1px solid var(--apple-separator-color); 
+    border-radius: 10px; /* Apple-like rounding */
+  }
+  #webcam {
+    display: block;
+    border-radius: 9px; /* Slightly less to fit inside parent */
+  }
+  #overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none; 
+  }
+  #status {
+    text-align: center;
+    margin-top: 10px; 
+    font-size: 0.875em; 
+    color: var(--apple-text-secondary);
+    font-family: var(--apple-system-font);
+  }
+
+  /* Modal Base Styles - Apple HIG Inspired */
+  .modal-overlay { 
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.4); /* Slightly less opaque scrim */
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-out, visibility 0s linear 0.3s;
+  }
+
+  .modal-overlay.visible {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .modal-content { 
+    background-color: var(--apple-control-background);
+    color: var(--apple-text-primary);
+    padding: 20px 24px;
+    border-radius: 14px; /* Prominent rounding for modals */
+    max-width: 800px; 
+    width: 90%;
+    max-height: calc(100vh - 40px); 
+    overflow-y: auto;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.15); /* Softer, more diffused shadow */
+    transform: scale(0.92);
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease-out; /* Apple-like springy feel */
+  }
+  .modal-overlay.visible .modal-content {
+      transform: scale(1);
+      opacity: 1;
+  }
+  
+  #cheatsheet-modal-overlay img { 
+    display: block; 
+    max-width: 100%; 
+    max-height: 100%;
+    border-radius: 8px; 
+  }
+
+  #asl-info-modal-content h2 {
+    color: var(--apple-text-primary);
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-size: 1.25em; /* Around 20pt */
+    font-weight: 600; /* SF Semibold */
+    font-family: var(--apple-system-font);
+  }
+  #asl-info-modal-content ul {
+    list-style-type: disc;
+    padding-left: 20px;
+    font-family: var(--apple-system-font);
+    color: var(--apple-text-secondary);
+  }
+  #asl-info-modal-content li {
+    margin-bottom: 10px;
+    line-height: 1.5;
+  }
+  #asl-info-modal-content li strong {
+    font-weight: 600; /* Semibold */
+    color: var(--apple-text-primary); /* Darker for emphasis */
+  }
+  #asl-info-modal-content p {
+      font-family: var(--apple-system-font);
+      color: var(--apple-text-secondary);
+      line-height: 1.5;
+  }
+  #close-asl-info-btn { 
+    /* Will inherit general button styles, ensure it fits the context */
+  }
+
+
+  /* General UI - Apple HIG Inspired */
+  #practice-controls {
+    font-family: var(--apple-system-font);
+    background-color: var(--apple-control-background); 
+    border-radius: 12px; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Very subtle shadow */
+    /* border: 1px solid var(--apple-separator-color); */ /* Alternative to shadow for definition */
+    max-width: 440px; /* Increased from 370px */
+    width: calc(100% - 32px); 
+    margin: 24px auto; 
+    padding: 20px; 
+    text-align: center; 
+    transition: all 0.3s ease-out;
+    box-sizing: border-box;
+  }
+
+  /* Input Field - Apple HIG */
+  #word-practice-setup {
+    display: flex;
+    align-items: center; 
+    gap: 10px; 
+    margin-bottom: 20px; 
+  }
+  #word-practice-setup input[type="text"] {
+    font-family: var(--apple-system-font);
+    font-size: 1em; /* Around 16-17pt */
+    color: var(--apple-text-primary);
+    padding: 10px 12px; 
+    border: 1px solid var(--apple-medium-gray);
+    background-color: #fcfcfd; /* Very slightly off-white, or var(--apple-light-gray) */
+    border-radius: 8px; 
+    flex-grow: 1; 
+    min-width: 0; 
+    box-sizing: border-box;
+    transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out;
+  }
+  #word-practice-setup input[type="text"]:focus {
+    outline: none;
+    border-color: var(--apple-blue);
+    box-shadow: 0 0 0 3px rgba(var(--apple-blue-rgb), 0.2); /* Subtle focus ring */
+  }
+  #word-practice-setup input[type="text"]::placeholder {
+      color: var(--apple-dark-gray);
+      opacity: 1; /* Placeholders are usually solid color */
+  }
+
+
+  /* Buttons - Apple HIG Inspired */
+  #practice-controls button, 
+  .button-primary, .button-secondary, .button-tertiary {
+    font-family: var(--apple-system-font);
+    font-weight: 500; 
+    font-size: 0.9375em; 
+    text-transform: none; 
+    padding: 0 18px; /* Adjusted horizontal padding for pill shape */
+    height: 38px; 
+    line-height: 38px; 
+    border-radius: 19px; /* Pill shape (half of height) */
+    border: none;
+    cursor: pointer;
+    /* background-color: transparent; */ /* Base transparent, specific types override */
+    color: var(--apple-blue);
+    
+    position: static; 
+    overflow: visible;
+
+    box-shadow: none; 
+    transition: background-color 0.15s ease-out, color 0.15s ease-out, border-color 0.15s ease-out, transform 0.1s ease-out;
+  }
+  #practice-controls button:active {
+      transform: scale(0.97); /* Subtle press effect */
+  }
+  /* Remove Material ripple pseudo-elements */
+  #practice-controls button::after, 
+  .button-primary::after, .button-secondary::after, .button-tertiary::after {
+    content: none;
+  }
+
+  /* Primary Buttons (Filled) - Now Apple Grey */
+  .button-primary {
+    background-color: var(--apple-light-gray); /* Apple light grey fill */
+    color: var(--apple-blue); /* Apple blue text */
+  }
+  .button-primary:hover {
+    background-color: var(--apple-medium-gray); /* Apple medium grey on hover */
+  }
+
+  /* Secondary Buttons - Now also Apple Grey */
+  .button-secondary {
+    background-color: var(--apple-light-gray); /* Apple light grey fill */
+    color: var(--apple-blue); /* Apple blue text */
+  }
+  .button-secondary:hover {
+    background-color: var(--apple-medium-gray); /* Apple medium grey on hover */
+  }
+
+  /* Tertiary Buttons (Plain Text) */
+  .button-tertiary, #close-asl-info-btn {
+    color: var(--apple-blue); 
+    background-color: transparent; /* Explicitly transparent */
+    font-weight: 400; 
+    height: auto; 
+    line-height: normal;
+    padding: 6px 8px;
+  }
+  .button-tertiary:hover, #close-asl-info-btn:hover {
+    background-color: rgba(var(--apple-blue-rgb), 0.08);
+  }
+
+
+  /* Mode Selection - Apple Segmented Control */
+  #mode-selection-container {
+    display: inline-flex; /* So it doesn't take full width */
+    border: 1px solid var(--apple-medium-gray); 
+    border-radius: 9px; /* Apple typical rounding for segmented control */
+    margin-bottom: 24px; 
+    padding: 2px; /* Internal padding for the track */
+    background-color: var(--apple-medium-gray); /* Track color */
+    overflow: visible; /* Allow shadows from active segment */
+    box-shadow: none;
+  }
+  .mode-button {
+    flex-grow: 1; 
+    text-align: center;
+    padding: 7px 14px; 
+    cursor: pointer;
+    background-color: transparent; /* Segments are transparent on the track */
+    color: var(--apple-text-secondary); 
+    font-size: 0.8125em; /* Around 13pt */
+    font-weight: 500; /* Medium */
+    text-transform: none; /* No uppercase */
+    border: none; 
+    border-radius: 7px; /* Rounding for segments, slightly less than track */
+    transition: background-color 0.25s ease-out, color 0.25s ease-out, box-shadow 0.2s ease-out;
+    margin: 0; /* No margin between segments */
+  }
+  .mode-button:not(:last-child) {
+    /* No explicit border, track background serves as separator */
+  }
+  .mode-button.active-mode {
+    background-color: var(--apple-control-background); /* Selected segment is white/surface */
+    color: var(--apple-text-primary); /* Or apple-blue if you want selected text to be accent */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 1px rgba(0,0,0,0.04); /* Subtle shadow for selected segment */
+    font-weight: 600; /* Semibold for active */
+  }
+  .mode-button:not(.active-mode):hover {
+     color: var(--apple-text-primary); /* Darken text on hover for unselected */
+  }
+
+
+  /* Collapsible Section Animation - Simpler, faster */
+  .collapsible-section {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease-in-out, 
+                opacity 0.2s ease-in-out 0.05s, 
+                margin-top 0.25s ease-in-out, 
+                margin-bottom 0.25s ease-in-out;
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+  .collapsible-section.visible-section {
+    max-height: 120px; 
+    opacity: 1;
+    margin-top: 16px; 
+    margin-bottom: 16px; 
+  }
+  #core-practice-display.visible-section {
+    max-height: 230px; /* Adjusted for content */
+  }
+
+
+  #sign-display-area {
+    margin-bottom: 8px; 
+    line-height: 1.1;
+  }
+  #target-sign-display {
+    font-size: 3em; 
+    font-weight: 300; 
+    color: var(--apple-text-primary); 
+    display: block; 
+    margin-bottom: 2px; /* Further reduced from 4px */
+  }
+  #detected-sign-display {
+    font-size: 0.9375em; 
+    color: var(--apple-text-secondary); 
+    min-height: 1.4em; 
+    display: block; 
+  }
+  
+  p#feedback-message {
+    min-height: 1.4em; 
+    font-size: 0.9375em; 
+    color: var(--apple-text-secondary);
+    margin-top: 6px; /* Further reduced from 8px */
+    margin-bottom: 12px; /* Reduced from 16px for overall compaction */
+  }
+
+  #hint-action-area {
+    display: flex;
+    /* justify-content: center; */ /* Switching to space-evenly */
+    justify-content: space-evenly; /* Distribute space evenly */
+    gap: 12px; /* Gap becomes minimum spacing with space-evenly */
+    align-items: center;
+    margin-bottom: 12px; 
+    width: 100%; /* Allow space-evenly to work across the full width */
+  }
+
+  p#hint-display {
+    min-height: 1.4em; 
+    font-size: 0.875em; 
+    color: var(--apple-text-secondary);
+    margin-top: 4px; /* Reduced top margin */
+    margin-bottom: 8px; 
+    line-height: 1.4;
+  }
+
+  #tertiary-actions {
+    margin-top: 20px; 
+    text-align: center; 
+  }
+  #why-asl-link {
+    font-family: var(--apple-system-font);
+    font-size: 0.8125em; 
+    color: var(--apple-dark-gray); 
+    text-decoration: none;
+    padding: 4px 0; /* Vertical padding, no horizontal for link-like feel */
+    border-radius: 4px; 
+    transition: color 0.15s ease-out;
+    text-transform: none; 
+  }
+  #why-asl-link:hover {
+    color: var(--apple-blue); 
+    /* background-color: transparent; */ /* No background on hover for simple link */
+  }
+
+  /* Correct Animation - Smoother, Apple-like */
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+    40% { opacity: 1; transform: translate(-50%, -50%) scale(1.02); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+  }
+  #correct-animation-overlay.show-animation {
+    display: block !important; 
+    animation: fadeInOut 0.7s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  }
+
+</style> 
