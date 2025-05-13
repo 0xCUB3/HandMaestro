@@ -4,7 +4,7 @@
 ---
 # HandMaestro: ASL Practice Platform
 
-HandMaestro is a web application that provides an interactive platform for learning American Sign Language (ASL).
+Originally made for a 2023 school project, I decided to modernize the web page and share it with the public. HandMaestro is a web application that provides an interactive platform for learning American Sign Language (ASL).
 
 It utilizes your webcam and sophisticated on-device machine learning to interpret and provide real-time feedback on ASL gestures, starting with the foundational alphabet. This approach gives instant feedback, allowing for fast, free practice.
 
