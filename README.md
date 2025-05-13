@@ -1,3 +1,7 @@
+![CleanShot 2025-05-13 at 15 15 02@2x](https://github.com/user-attachments/assets/d544c15a-d747-4839-9c2f-103703a9085f)
+
+
+---
 # HandMaestro: ASL Practice Platform
 
 HandMaestro is a web application that provides an interactive platform for learning American Sign Language (ASL).
