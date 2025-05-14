@@ -102,16 +102,15 @@
   const aslInfoModalOverlay = document.getElementById('asl-info-modal-overlay') as HTMLDivElement;
   const closeAslInfoBtn = document.getElementById('close-asl-info-btn') as HTMLButtonElement;
 
-  // Define the signs your model can recognize. This might need to be adjusted
-  // based on the actual categories in ASL_Recognizer.task
+  // Define the signs the model can recognize
   const availableSigns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y']; // Removed J, Z as per Sign-ify
   let currentSignIndex = 0;
-  let signsAlreadyPracticedInLetterMode: string[] = []; // Keep track of practiced signs to avoid immediate repeats
+  let signsAlreadyPracticedInLetterMode: string[] = [];
 
   let currentWordToPractice = "";
   let currentWordLetterIndex = 0;
   let correctSignStartTime: number | null = null;
-  const CORRECT_SIGN_HOLD_DURATION = 300; // milliseconds
+  const CORRECT_SIGN_HOLD_DURATION = 300; // ms
 
   let gestureRecognizer: any = null;
   let vision: any = null; // To store FilesetResolver instance
@@ -122,7 +121,7 @@
   // import { getAslGestures } from '../gestures/aslAlphabet.js'; // REMOVED - No longer using Fingerpose
   import { getHint } from '../gestures/aslHints.js';
 
-  const visionTasksVersion = 'latest'; // Using latest to avoid specific version issues for now
+  const visionTasksVersion = 'latest'; // latest seems to be the only one that works
 
   const hintBtn = document.getElementById('hint-btn') as HTMLButtonElement;
   const hintDisplay = document.getElementById('hint-display') as HTMLDivElement;
@@ -135,11 +134,11 @@
       // Show hint
       const hintText = getHint(currentTargetSign);
       hintDisplay.textContent = hintText;
-      // hintBtn.textContent = "Hide Hint"; // Optional: update button text
+      // hintBtn.textContent = "Hide Hint"; // REMOVED - No longer using hint button
     } else {
       // Hide hint
       hintDisplay.innerHTML = "&nbsp;"; // Clear hint and maintain space
-      // hintBtn.textContent = "Show Hint"; // Optional: update button text
+      // hintBtn.textContent = "Show Hint"; // REMOVED - No longer using hint button
     }
   });
 
@@ -156,7 +155,7 @@
 
     // Click on overlay (outside the image) to close
     cheatsheetModalOverlay.addEventListener('click', (event) => {
-      if (event.target === cheatsheetModalOverlay) { // Check if the click was directly on the overlay
+      if (event.target === cheatsheetModalOverlay) {
         cheatsheetModalOverlay.classList.remove('visible');
         toggleCheatsheetBtn.textContent = 'Show Alphabet Sheet';
       }
@@ -228,22 +227,19 @@
       GestureRecognizerLib = await import(/* @vite-ignore */ `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${visionTasksVersion}/vision_bundle.js`);
       console.log("DEBUG: vision_bundle.js (GestureRecognizerLib) loaded:", GestureRecognizerLib);
       
-      // Attempt to get DrawingUtils and HAND_CONNECTIONS from the visionBundle
-      if (GestureRecognizerLib && GestureRecognizerLib.DrawingUtils) { // Case-sensitive: DrawingUtils
-        drawingUtils = new GestureRecognizerLib.DrawingUtils(canvasCtx); // Instantiate DrawingUtils
+      if (GestureRecognizerLib && GestureRecognizerLib.DrawingUtils) {
+        drawingUtils = new GestureRecognizerLib.DrawingUtils(canvasCtx);
         console.log("DEBUG: Found and instantiated DrawingUtils from GestureRecognizerLib.");
         
-        // HAND_CONNECTIONS is usually a static property or a separate export.
-        // It might be on GestureRecognizerLib.DrawingUtils (static property) or GestureRecognizerLib directly.
         if (GestureRecognizerLib.DrawingUtils.HAND_CONNECTIONS) {
             HAND_CONNECTIONS_DATA = GestureRecognizerLib.DrawingUtils.HAND_CONNECTIONS;
             console.log("DEBUG: Found HAND_CONNECTIONS on DrawingUtils class.");
-        } else if (GestureRecognizerLib.HAND_CONNECTIONS) { // Check if it's exported at the top level of the bundle
+        } else if (GestureRecognizerLib.HAND_CONNECTIONS) {
             HAND_CONNECTIONS_DATA = GestureRecognizerLib.HAND_CONNECTIONS;
             console.log("DEBUG: Found HAND_CONNECTIONS on GestureRecognizerLib itself.");
         } else {
             console.warn("DEBUG: HAND_CONNECTIONS not found. Landmark connections will not be drawn.");
-            HAND_CONNECTIONS_DATA = []; // Default to empty if not found
+            HAND_CONNECTIONS_DATA = [];
         }
       } else {
         console.warn("DEBUG: DrawingUtils class not found on GestureRecognizerLib. Landmarks will not be drawn.");
@@ -259,12 +255,10 @@
 
       gestureRecognizer = await GestureRecognizerLib.GestureRecognizer.createFromOptions(vision, {
         baseOptions: {
-          // IMPORTANT: Replace with the correct path to your model!
-          // Assuming you place ASL_Recognizer.task in the public/models/ directory of your Astro project.
           modelAssetPath: `/models/ASL_Recognizer.task`, 
-          delegate: "GPU" // Use GPU if available, can also be "CPU"
+          delegate: "GPU"
         },
-        runningMode: "VIDEO", // 'VIDEO' for recognizeForVideo, or 'LIVE_STREAM' for recognizeAsync
+        runningMode: "VIDEO", // 'VIDEO' for recognizeForVideo, or 'LIVE_STREAM' for recognizeAsync -- video more appropriate for webcam
         numHands: 1,
         // Canned gestures are not needed if the .task model handles ASL directly
         // minHandDetectionConfidence: 0.5,
@@ -291,7 +285,7 @@
     }
 
     // Ensure canvas drawing surface matches video's intrinsic size if it hasn't been set or has changed.
-    // This is a fallback, ResizeObserver is preferred for dynamic changes.
+    // This is a fallback bc ResizeObserver is preferred for dynamic changes.
     if (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight) {
         canvasElement.width = videoElement.videoWidth;
         canvasElement.height = videoElement.videoHeight;
@@ -401,10 +395,6 @@
         // Set intrinsic size of the canvas drawing surface
         canvasElement.width = videoElement.videoWidth;
         canvasElement.height = videoElement.videoHeight;
-        
-        // The CSS handles the display size (100% width/height of parent)
-        // So, no need to set canvasElement.style.width/height here
-        // if they are already 100% via CSS.
 
         if (statusElement) statusElement.textContent = "Webcam active. Initializing models...";
         
@@ -423,14 +413,11 @@
 
   // Ensure the DOM is fully loaded
   if (document.readyState === 'loading') {
-    // document.addEventListener('DOMContentLoaded', setupWebcam);
-    // Defer setupWebcam and ResizeObserver until after initial UI mode setup
     document.addEventListener('DOMContentLoaded', () => {
         setupWebcam();
         setupResizeObserver();
     });
   } else {
-    // setupWebcam();
     setupWebcam();
     setupResizeObserver();
   }
@@ -440,11 +427,6 @@
     const resizeObserver = new ResizeObserver(entries => {
       for (let entry of entries) {
         if (entry.target === videoElement) {
-          // Update canvas drawing surface resolution to match video's intrinsic resolution
-          // This is important if the video source itself changes resolution, though less common.
-          // More critically, MediaPipe's drawing utils use the canvas width/height attributes
-          // for scaling, so these should reflect the video's natural dimensions.
-          // The visual scaling to fit the responsive container is handled by CSS.
           if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
             if (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight) {
                 canvasElement.width = videoElement.videoWidth;
@@ -499,7 +481,6 @@
             if (feedbackMessageElement) feedbackMessageElement.textContent = "No signs available for practice.";
         }
       }
-      // For word mode, initial state is handled by updateUIVisibilityForMode (shows input)
       
       updateUIVisibilityForMode(currentPracticeMode);
     });
@@ -536,8 +517,7 @@
 
     // Tertiary actions (Sheet, Why ASL) - always visible
     if (tertiaryActionsDiv) {
-        // Assuming flex is the desired layout for tertiary actions container for centering/spacing
-        tertiaryActionsDiv.style.display = 'block'; // Changed to block for the single centered link
+        tertiaryActionsDiv.style.display = 'block';
     }
 
     // Update feedback message and target/detected displays based on state
@@ -557,7 +537,6 @@
             // We just need to ensure they are not inappropriately cleared here.
             // If targetSignDisplay is somehow '-', it will be updated by predictWebcam or updateTargetSignForWordPractice
         } 
-        // predictedSignDisplay is updated by predictWebcam, so no general reset here unless truly idle.
     }
   }
 
@@ -570,7 +549,6 @@
       correctSignStartTime = null;
       
       updateTargetSignForWordPractice(); 
-      // Feedback message for starting word practice is now set in updateTargetSignForWordPractice as "Show [Letter]"
       
       updateUIVisibilityForMode(currentPracticeMode); 
 
@@ -869,14 +847,20 @@
     font-weight: 500; 
     font-size: 0.9375em; 
     text-transform: none; 
-    padding: 0 18px; /* Adjusted horizontal padding for pill shape */
+    padding: 1px 12px; /* Adjusted for flex centering, multi-line, and more text space */
     height: 38px; 
-    line-height: 38px; 
+    line-height: 1.2; /* Suitable for multi-line text */
     border-radius: 19px; /* Pill shape (half of height) */
     border: none;
     cursor: pointer;
-    /* background-color: transparent; */ /* Base transparent, specific types override */
     color: var(--apple-blue);
+    
+    box-sizing: border-box; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center; /* Ensures wrapped text is centered */
+    white-space: normal; /* Allows text to wrap */
     
     position: static; 
     overflow: visible;
