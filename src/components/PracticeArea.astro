@@ -290,6 +290,13 @@
       return;
     }
 
+    // Ensure canvas drawing surface matches video's intrinsic size if it hasn't been set or has changed.
+    // This is a fallback, ResizeObserver is preferred for dynamic changes.
+    if (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight) {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+    }
+
     const startTimeMs = performance.now();
     if (videoElement.currentTime !== lastVideoTime) {
       lastVideoTime = videoElement.currentTime;
@@ -391,8 +398,14 @@
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       videoElement.srcObject = stream;
       videoElement.addEventListener('loadeddata', async () => {
+        // Set intrinsic size of the canvas drawing surface
         canvasElement.width = videoElement.videoWidth;
         canvasElement.height = videoElement.videoHeight;
+        
+        // The CSS handles the display size (100% width/height of parent)
+        // So, no need to set canvasElement.style.width/height here
+        // if they are already 100% via CSS.
+
         if (statusElement) statusElement.textContent = "Webcam active. Initializing models...";
         
         await loadGestureRecognizer(); 
@@ -410,9 +423,42 @@
 
   // Ensure the DOM is fully loaded
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupWebcam);
+    // document.addEventListener('DOMContentLoaded', setupWebcam);
+    // Defer setupWebcam and ResizeObserver until after initial UI mode setup
+    document.addEventListener('DOMContentLoaded', () => {
+        setupWebcam();
+        setupResizeObserver();
+    });
   } else {
+    // setupWebcam();
     setupWebcam();
+    setupResizeObserver();
+  }
+
+  // ResizeObserver to keep canvas resolution in sync with video element's actual display size
+  function setupResizeObserver() {
+    const resizeObserver = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        if (entry.target === videoElement) {
+          // Update canvas drawing surface resolution to match video's intrinsic resolution
+          // This is important if the video source itself changes resolution, though less common.
+          // More critically, MediaPipe's drawing utils use the canvas width/height attributes
+          // for scaling, so these should reflect the video's natural dimensions.
+          // The visual scaling to fit the responsive container is handled by CSS.
+          if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+            if (canvasElement.width !== videoElement.videoWidth || canvasElement.height !== videoElement.videoHeight) {
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+                console.log(`ResizeObserver: Canvas resolution updated to ${canvasElement.width}x${canvasElement.height}`);
+            }
+          }
+        }
+      }
+    });
+
+    if (videoElement) {
+        resizeObserver.observe(videoElement);
+    }
   }
 
   // --- MODE SELECTION LOGIC --- 
@@ -649,21 +695,30 @@
 
   #practice-area {
     position: relative;
-    width: 640px; 
-    height: 480px; 
-    margin: 20px auto; /* Increased margin slightly */
-    border: 1px solid var(--apple-separator-color); 
-    border-radius: 10px; /* Apple-like rounding */
+    /* width: 640px; */ /* Changed for responsiveness */
+    /* height: 480px; */ /* Changed for responsiveness */
+    width: 100%;      /* Make it full width of its container */
+    max-width: 640px; /* But not larger than the original video width */
+    aspect-ratio: 640 / 480; /* Maintain aspect ratio */
+    margin: 20px auto;
+    border: 1px solid var(--apple-separator-color);
+    border-radius: 10px;
+    overflow: hidden; /* Ensure children like video/canvas don't break out of rounded corners */
   }
   #webcam {
     display: block;
-    border-radius: 9px; /* Slightly less to fit inside parent */
+    /* border-radius: 9px; */ /* Removed, parent overflow:hidden will clip */
+    width: 100%;    /* Make video fill the #practice-area container */
+    height: 100%;   /* Make video fill the #practice-area container */
+    object-fit: cover; /* Cover ensures the video fills, might crop if aspect ratios differ */
   }
   #overlay {
     position: absolute;
     top: 0;
     left: 0;
-    pointer-events: none; 
+    width: 100%;    /* Make canvas fill the #practice-area container */
+    height: 100%;   /* Make canvas fill the #practice-area container */
+    pointer-events: none;
   }
   #status {
     text-align: center;
@@ -761,10 +816,14 @@
     font-family: var(--apple-system-font);
     background-color: var(--apple-control-background); 
     border-radius: 12px; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Very subtle shadow */
-    /* border: 1px solid var(--apple-separator-color); */ /* Alternative to shadow for definition */
-    max-width: 440px; /* Increased from 370px */
-    width: calc(100% - 32px); 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    /* max-width: 440px; */ /* Keep this to constrain width on larger screens */
+    /* width: calc(100% - 32px); */ /* This is good for responsiveness */
+    
+    /* New properties for centering and ensuring it doesn't exceed viewport width on mobile */
+    max-width: min(440px, calc(100vw - 32px)); /* Max width is 440px OR viewport width minus padding */
+    width: 100%; /* Takes up available width up to max-width */
+    
     margin: 24px auto; 
     padding: 20px; 
     text-align: center; 
